@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>Hypertrophy Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:#0a0908; --surface:#141312; --surface-alt:#0f0e0d; --border:#242321;
+    --text:#f5f2ed; --text-muted:#8a8580; --text-faint:#6b6660; --text-dim:#4a4540;
+    --accent:#ff4d1f; --accent-contrast:#0a0908;
+    --accent-soft:rgba(255,77,31,0.12); --accent-bg:rgba(255,77,31,0.06); --accent-border:rgba(255,77,31,0.2);
+    --success-soft:rgba(125,216,125,0.15); --success-bg:rgba(125,216,125,0.04);
+    --success-border:rgba(125,216,125,0.2); --success-text:#7dd87d;
+    --overlay:rgba(10,9,8,0.85); --nav-bg:rgba(10,9,8,0.92); --shadow:rgba(0,0,0,0.5);
+    --day-vermilion:#ff4d1f; --day-vermilion-soft:rgba(255,77,31,0.12);
+    --day-amber:#f59e0b; --day-amber-soft:rgba(245,158,11,0.12);
+    --day-rose:#f43f5e; --day-rose-soft:rgba(244,63,94,0.12);
+    --day-cyan:#06b6d4; --day-cyan-soft:rgba(6,182,212,0.12);
+    --day-emerald:#10b981; --day-emerald-soft:rgba(16,185,129,0.12);
+    --day-violet:#8b5cf6; --day-violet-soft:rgba(139,92,246,0.12);
+    --day-slate:#64748b; --day-slate-soft:rgba(100,116,139,0.12);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    transition: background .3s, color .3s;
+    overscroll-behavior: none;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+  input, textarea { font: inherit; color: inherit; }
+  ul, ol { list-style: none; }
+  svg { display: block; }
+  .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .serif { font-family: 'Fraunces', Georgia, serif; }
+  .italic { font-style: italic; }
+  .tab-num { font-variant-numeric: tabular-nums; }
+  .upper { text-transform: uppercase; letter-spacing: 0.2em; }
+  .upper-wide { text-transform: uppercase; letter-spacing: 0.3em; }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type=number] { -moz-appearance: textfield; }
+  .themed-input {
+    background: var(--surface-alt); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px; font-size: 14px; outline: none;
+    transition: border-color .15s;
+    width: 100%;
+    font-family: 'JetBrains Mono', monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  .themed-input::placeholder { color: var(--text-faint); }
+  .themed-input:focus { border-color: var(--accent); }
+  .scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .scroll-x::-webkit-scrollbar { display: none; }
+  .fade-in { animation: fadeIn .25s ease-out both; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  .slide-up { animation: slideUp .25s ease-out both; }
+  @keyframes slideUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+
+  /* Layout */
+  .header {
+    position: sticky; top: 0; z-index: 30;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    background: var(--overlay); border-bottom: 1px solid var(--border);
+  }
+  .header-inner {
+    padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { display: flex; align-items: center; gap: 8px; }
+  .brand-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent); color: var(--accent-contrast);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .brand-text-top { font-family: 'Fraunces', serif; font-size: 12px; font-weight: 500; color: var(--text); }
+  .brand-text-bot { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--text-muted); }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--surface); border: 1px solid var(--border); color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .date-stack { text-align: right; }
+  .date-top { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text); }
+  .date-bot { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--text-muted); }
+
+  /* Content shared */
+  .content { padding-bottom: 128px; }
+  .page-head { padding: 24px 16px 16px; }
+  .page-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .page-title { font-family: 'Fraunces', serif; font-style: italic; font-size: 36px; color: var(--text); line-height: 1; font-weight: 400; }
+  .page-lede { font-size: 14px; line-height: 1.5; color: var(--text-muted); margin-top: 12px; }
+  .section-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px; }
+  .card-lg { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 24px; }
+  .stack-2 > * + * { margin-top: 8px; }
+  .stack-3 > * + * { margin-top: 12px; }
+  .stack-4 > * + * { margin-top: 16px; }
+
+  /* Day picker */
+  .day-pills { padding: 24px 16px 16px; }
+  .day-pill-row { display: flex; gap: 8px; }
+  .day-pill {
+    flex-shrink: 0; padding: 10px 16px; border-radius: 12px;
+    background: var(--surface); color: var(--text-muted);
+    border: 1px solid var(--border);
+    font-family: 'JetBrains Mono', monospace;
+    transition: all .15s;
+  }
+  .day-pill.active { border: none; }
+  .day-pill-top { font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.7; }
+  .day-pill-bot { font-size: 12px; font-weight: 500; margin-top: 2px; }
+
+  /* Hero card */
+  .hero {
+    position: relative; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 24px; padding: 24px; margin: 0 16px 24px;
+  }
+  .hero-blur {
+    position: absolute; top: 0; right: 0; width: 192px; height: 192px;
+    border-radius: 50%; filter: blur(48px); opacity: 0.2;
+  }
+  .hero-content { position: relative; }
+  .hero-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+  .hero-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; margin-bottom: 4px; }
+  .hero-title { font-family: 'Fraunces', serif; font-style: italic; font-size: 36px; color: var(--text); line-height: 1; font-weight: 400; }
+  .hero-badge { width: 56px; height: 56px; border-radius: 16px; display: flex; align-items: center; justify-content: center; }
+  .hero-stats { display: flex; align-items: baseline; gap: 24px; }
+  .stat-num { font-family: 'JetBrains Mono', monospace; font-size: 28px; font-weight: 300; color: var(--text); font-variant-numeric: tabular-nums; }
+  .stat-num span { color: var(--text-dim); }
+  .stat-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-muted); margin-top: 4px; }
+  .progress-bar { margin-top: 20px; height: 4px; border-radius: 2px; overflow: hidden; background: var(--border); }
+  .progress-fill { height: 100%; transition: width .5s; }
+
+  /* Exercise card */
+  .ex-list { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
+  .ex-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; overflow: hidden;
+  }
+  .ex-card.done { background: var(--success-bg); border-color: var(--success-border); }
+  .ex-head {
+    width: 100%; padding: 16px; display: flex; align-items: flex-start; gap: 12px;
+    text-align: left;
+  }
+  .ex-badge {
+    width: 40px; height: 40px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; font-family: 'JetBrains Mono', monospace;
+    font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums;
+  }
+  .ex-info { flex: 1; min-width: 0; }
+  .ex-titlerow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ex-title { font-family: 'Fraunces', serif; font-size: 16px; font-weight: 500; color: var(--text); line-height: 1.2; }
+  .ex-tag {
+    font-family: 'JetBrains Mono', monospace; font-size: 9px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    padding: 2px 6px; border-radius: 4px;
+    background: var(--accent-soft); color: var(--accent);
+  }
+  .ex-meta { display: flex; align-items: center; gap: 12px; margin-top: 6px; font-size: 12px; font-family: 'JetBrains Mono', monospace; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .ex-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+  .ex-count { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .ex-chev { transition: transform .2s; color: var(--text-muted); }
+  .ex-chev.open { transform: rotate(90deg); }
+  .ex-body { padding: 0 16px 16px; }
+  .cues {
+    padding: 12px; border-radius: 12px; background: var(--surface-alt);
+    margin-bottom: 16px;
+  }
+  .cues-label {
+    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    text-transform: uppercase; letter-spacing: 0.15em;
+  }
+  .cues-text { font-size: 12px; line-height: 1.5; color: var(--text); }
+  .tempo-row { display: flex; align-items: center; gap: 16px; font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+  .tempo-item { display: flex; align-items: center; gap: 6px; font-family: 'JetBrains Mono', monospace; }
+  .set-grid-head {
+    display: grid; grid-template-columns: 40px 1fr 1fr 44px; gap: 8px;
+    font-family: 'JetBrains Mono', monospace; font-size: 10px;
+    color: var(--text-faint); text-transform: uppercase; letter-spacing: 0.15em;
+    margin-bottom: 8px;
+  }
+  .set-row { display: grid; grid-template-columns: 40px 1fr 1fr 44px; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .set-num { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .set-check {
+    width: 44px; height: 44px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--surface-alt); border: 1px solid var(--border); color: var(--text-faint);
+    transition: all .15s;
+  }
+  .set-check.done { background: var(--success-soft); border-color: var(--success-border); color: var(--success-text); }
+
+  /* Rest day */
+  .rest-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; text-align: center; margin: 0 16px;
+  }
+  .rest-title { font-family: 'Fraunces', serif; font-size: 20px; color: var(--text); margin-top: 12px; margin-bottom: 8px; }
+  .rest-text { font-size: 14px; line-height: 1.5; color: var(--text-muted); }
+
+  /* Nutrition */
+  .macro-big { font-family: 'JetBrains Mono', monospace; font-size: 44px; font-weight: 300; color: var(--text); font-variant-numeric: tabular-nums; }
+  .macro-label { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .macro-row-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px; }
+  .macro-row-label { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--text-muted); }
+  .macro-row-num { font-family: 'JetBrains Mono', monospace; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .macro-bar { height: 4px; border-radius: 2px; overflow: hidden; background: var(--border); }
+  .macro-fill { height: 100%; transition: width .3s; }
+  .alert {
+    background: var(--accent-bg); border: 1px solid var(--accent-border);
+    border-radius: 16px; padding: 16px; display: flex; gap: 12px;
+  }
+  .alert-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .alert-title { font-family: 'Fraunces', serif; font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px; }
+  .alert-text { font-size: 12px; line-height: 1.5; color: var(--text-muted); }
+  .meal-list { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
+  .meal-head { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+  .meal-time { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); }
+  .meal-name { font-family: 'Fraunces', serif; font-size: 18px; color: var(--text); margin-top: 2px; }
+  .meal-totals {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;
+    margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);
+  }
+  .meal-total-num { font-family: 'JetBrains Mono', monospace; font-size: 14px; color: var(--text); font-variant-numeric: tabular-nums; }
+  .meal-total-lbl { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-faint); }
+  .meal-items { display: flex; flex-direction: column; gap: 4px; }
+  .meal-item { font-size: 12px; display: flex; align-items: flex-start; gap: 8px; color: var(--text-muted); }
+  .meal-note {
+    margin-top: 12px; padding: 10px; border-radius: 8px;
+    background: var(--surface-alt); color: var(--text-muted);
+    border-left: 2px solid var(--accent); font-size: 11px; line-height: 1.5;
+  }
+  .supp-row {
+    padding: 12px; border-radius: 12px; display: flex; align-items: flex-start; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .supp-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .supp-name { font-size: 14px; font-weight: 500; color: var(--text); }
+  .supp-dose { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .supp-note { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* Progress */
+  .stat-grid { padding: 0 16px 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* Program tab */
+  .prog-list { padding: 0 16px; display: flex; flex-direction: column; gap: 12px; }
+  .prog-day-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 12px; }
+  .prog-day-num {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'JetBrains Mono', monospace;
+  }
+  .prog-subtitle { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; }
+  .prog-name { font-family: 'Fraunces', serif; font-size: 18px; color: var(--text); }
+  .prog-volume { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; text-align: right; color: var(--text-faint); }
+  .prog-ex-list { padding-top: 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+  .prog-ex { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-size: 12px; }
+  .prog-ex-name { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prog-ex-sets { font-family: 'JetBrains Mono', monospace; flex-shrink: 0; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+  /* Rest timer */
+  .timer {
+    position: fixed; bottom: 80px; left: 16px; right: 16px;
+    max-width: 440px; margin: 0 auto; z-index: 40;
+    background: var(--surface); border: 1px solid var(--accent-border);
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 20px 60px var(--shadow);
+  }
+  .timer-track { height: 4px; background: var(--border); }
+  .timer-fill { height: 100%; background: var(--accent); transition: width 1s linear; }
+  .timer-body { display: flex; align-items: center; gap: 16px; padding: 16px; }
+  .timer-info { flex: 1; }
+  .timer-label { font-family: 'JetBrains Mono', monospace; font-size: 11px; text-transform: uppercase; letter-spacing: 0.2em; color: var(--text-muted); }
+  .timer-time { font-family: 'JetBrains Mono', monospace; font-size: 36px; font-weight: 300; color: var(--text); font-variant-numeric: tabular-nums; }
+  .timer-btn {
+    width: 44px; height: 44px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .timer-btn-primary { background: var(--accent-soft); color: var(--accent); }
+  .timer-btn-secondary { background: var(--surface-alt); color: var(--text-muted); }
+
+  /* Theme picker */
+  .modal-bg {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; align-items: flex-end; justify-content: center; padding: 16px;
+    background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  @media (min-width: 640px) { .modal-bg { align-items: center; } }
+  .modal {
+    width: 100%; max-width: 440px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 24px; overflow: hidden;
+    box-shadow: 0 20px 60px var(--shadow);
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px; border-bottom: 1px solid var(--border);
+  }
+  .modal-eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--accent); margin-bottom: 4px; }
+  .modal-title { font-family: 'Fraunces', serif; font-style: italic; font-size: 24px; color: var(--text); }
+  .modal-close {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: var(--surface-alt); color: var(--text-muted);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .theme-grid { padding: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .theme-option {
+    border-radius: 16px; padding: 16px; text-align: left;
+    border: 2px solid; transition: all .15s;
+  }
+  .theme-opt-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+  .theme-opt-icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .theme-opt-check {
+    width: 20px; height: 20px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .theme-opt-name { font-family: 'Fraunces', serif; font-size: 16px; margin-bottom: 2px; }
+  .theme-opt-mode { font-family: 'JetBrains Mono', monospace; font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 12px; }
+  .theme-opt-swatches { display: flex; gap: 6px; }
+  .swatch { width: 16px; height: 16px; border-radius: 50%; }
+
+  /* Bottom nav */
+  .nav {
+    position: fixed; bottom: 0; left: 0; right: 0; z-index: 30;
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    background: var(--nav-bg); border-top: 1px solid var(--border);
+  }
+  .nav-inner {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    padding: 8px 8px 20px; max-width: 440px; margin: 0 auto;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+  .nav-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 4px;
+    padding: 8px; border-radius: 12px;
+  }
+  .nav-lbl { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-faint); }
+  .nav-btn.active .nav-lbl { color: var(--accent); }
+
+  .history-row {
+    padding: 12px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface); border: 1px solid var(--border);
+  }
+  .history-date { font-size: 14px; color: var(--text); }
+  .history-sets { font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted); margin-top: 2px; }
+  .history-pct { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .empty-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 16px; padding: 32px; text-align: center;
+  }
+  .empty-text { font-size: 14px; color: var(--text-muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  // ============================================================
+  //  ICONS
+  // ============================================================
+  const svg = (inner, size) => `<svg width="${size||18}" height="${size||18}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  const svgFill = (inner, size) => `<svg width="${size||18}" height="${size||18}" viewBox="0 0 24 24" fill="currentColor" stroke="none">${inner}</svg>`;
+  const I = {
+    flame: s => svg('<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>', s),
+    dumbbell: s => svg('<path d="M14.4 14.4 9.6 9.6"/><path d="M18.657 21.485a2 2 0 1 1-2.829-2.828l-1.767 1.768a2 2 0 1 1-2.829-2.829l6.364-6.364a2 2 0 1 1 2.829 2.829l-1.768 1.767a2 2 0 1 1 2.828 2.829z"/><path d="m21.5 21.5-1.4-1.4"/><path d="M3.9 3.9 2.5 2.5"/><path d="M6.404 12.768a2 2 0 1 1-2.829-2.829l1.768-1.767a2 2 0 1 1-2.828-2.829l2.828-2.828a2 2 0 1 1 2.829 2.828l1.767-1.768a2 2 0 1 1 2.829 2.829z"/>', s),
+    apple: s => svg('<path d="M19 11.5a4.5 4.5 0 0 0-4.42-4.5A4 4 0 0 0 12 8a4 4 0 0 0-2.58-1A4.5 4.5 0 0 0 5 11.5C5 16 12 21 12 21s7-5 7-9.5Z"/><path d="M10 2c1 .5 2 2 2 5"/>', s),
+    trending: s => svg('<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>', s),
+    check: s => svg('<polyline points="20 6 9 17 4 12"/>', s),
+    chevron: s => svg('<polyline points="9 18 15 12 9 6"/>', s),
+    timer: s => svg('<line x1="10" x2="14" y1="2" y2="2"/><line x1="12" x2="15" y1="14" y2="11"/><circle cx="12" cy="14" r="8"/>', s),
+    play: s => svgFill('<polygon points="6 3 20 12 6 21 6 3"/>', s),
+    pause: s => svg('<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>', s),
+    rotate: s => svg('<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>', s),
+    info: s => svg('<circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="16" y2="12"/><line x1="12" x2="12.01" y1="8" y2="8"/>', s),
+    zap: s => svgFill('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>', s),
+    activity: s => svg('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>', s),
+    calendar: s => svg('<rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M3 10h18"/><path d="M8 2v4"/>', s),
+    award: s => svg('<circle cx="12" cy="8" r="6"/><path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"/>', s),
+    bar: s => svg('<line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>', s),
+    x: s => svg('<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', s),
+    droplet: s => svg('<path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/>', s),
+    palette: s => svg('<circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/>', s),
+    sun: s => svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/>', s),
+    moon: s => svg('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>', s)
+  };
+
+  // ============================================================
+  //  THEMES
+  // ============================================================
+  const THEMES = {
+    ember: { name: "Ember", mode: "dark", icon: "flame", vars: {
+      "--bg":"#0a0908","--surface":"#141312","--surface-alt":"#0f0e0d","--border":"#242321","--text":"#f5f2ed","--text-muted":"#8a8580","--text-faint":"#6b6660","--text-dim":"#4a4540","--accent":"#ff4d1f","--accent-contrast":"#0a0908","--accent-soft":"rgba(255,77,31,0.12)","--accent-bg":"rgba(255,77,31,0.06)","--accent-border":"rgba(255,77,31,0.2)","--success-soft":"rgba(125,216,125,0.15)","--success-bg":"rgba(125,216,125,0.04)","--success-border":"rgba(125,216,125,0.2)","--success-text":"#7dd87d","--overlay":"rgba(10,9,8,0.85)","--nav-bg":"rgba(10,9,8,0.92)","--shadow":"rgba(0,0,0,0.5)","--day-vermilion":"#ff4d1f","--day-vermilion-soft":"rgba(255,77,31,0.12)","--day-amber":"#f59e0b","--day-amber-soft":"rgba(245,158,11,0.12)","--day-rose":"#f43f5e","--day-rose-soft":"rgba(244,63,94,0.12)","--day-cyan":"#06b6d4","--day-cyan-soft":"rgba(6,182,212,0.12)","--day-emerald":"#10b981","--day-emerald-soft":"rgba(16,185,129,0.12)","--day-violet":"#8b5cf6","--day-violet-soft":"rgba(139,92,246,0.12)","--day-slate":"#64748b","--day-slate-soft":"rgba(100,116,139,0.12)"
+    }},
+    linen: { name: "Linen", mode: "light", icon: "sun", vars: {
+      "--bg":"#f7f3ec","--surface":"#ffffff","--surface-alt":"#fbf7f0","--border":"#e6dfd0","--text":"#1a1612","--text-muted":"#6b6457","--text-faint":"#8a8372","--text-dim":"#b8b0a0","--accent":"#c23d0f","--accent-contrast":"#ffffff","--accent-soft":"rgba(194,61,15,0.1)","--accent-bg":"rgba(194,61,15,0.05)","--accent-border":"rgba(194,61,15,0.25)","--success-soft":"rgba(47,122,62,0.1)","--success-bg":"rgba(47,122,62,0.04)","--success-border":"rgba(47,122,62,0.25)","--success-text":"#2f7a3e","--overlay":"rgba(247,243,236,0.85)","--nav-bg":"rgba(247,243,236,0.92)","--shadow":"rgba(92,75,45,0.12)","--day-vermilion":"#c23d0f","--day-vermilion-soft":"rgba(194,61,15,0.1)","--day-amber":"#b87510","--day-amber-soft":"rgba(184,117,16,0.1)","--day-rose":"#be2d4a","--day-rose-soft":"rgba(190,45,74,0.1)","--day-cyan":"#0891a8","--day-cyan-soft":"rgba(8,145,168,0.1)","--day-emerald":"#0e8f6b","--day-emerald-soft":"rgba(14,143,107,0.1)","--day-violet":"#6d44c9","--day-violet-soft":"rgba(109,68,201,0.1)","--day-slate":"#4a5566","--day-slate-soft":"rgba(74,85,102,0.1)"
+    }},
+    graphite: { name: "Graphite", mode: "light", icon: "sun", vars: {
+      "--bg":"#f5f6f7","--surface":"#ffffff","--surface-alt":"#f0f2f4","--border":"#dee2e7","--text":"#0f1419","--text-muted":"#525d6b","--text-faint":"#7a8594","--text-dim":"#a8b1bc","--accent":"#2563eb","--accent-contrast":"#ffffff","--accent-soft":"rgba(37,99,235,0.1)","--accent-bg":"rgba(37,99,235,0.05)","--accent-border":"rgba(37,99,235,0.25)","--success-soft":"rgba(5,150,105,0.1)","--success-bg":"rgba(5,150,105,0.04)","--success-border":"rgba(5,150,105,0.25)","--success-text":"#059669","--overlay":"rgba(245,246,247,0.85)","--nav-bg":"rgba(245,246,247,0.92)","--shadow":"rgba(15,20,25,0.1)","--day-vermilion":"#dc2626","--day-vermilion-soft":"rgba(220,38,38,0.1)","--day-amber":"#d97706","--day-amber-soft":"rgba(217,119,6,0.1)","--day-rose":"#e11d48","--day-rose-soft":"rgba(225,29,72,0.1)","--day-cyan":"#0891b2","--day-cyan-soft":"rgba(8,145,178,0.1)","--day-emerald":"#059669","--day-emerald-soft":"rgba(5,150,105,0.1)","--day-violet":"#7c3aed","--day-violet-soft":"rgba(124,58,237,0.1)","--day-slate":"#475569","--day-slate-soft":"rgba(71,85,105,0.1)"
+    }},
+    obsidian: { name: "Obsidian", mode: "dark", icon: "moon", vars: {
+      "--bg":"#08101a","--surface":"#0f1a2a","--surface-alt":"#0a1420","--border":"#1d2d45","--text":"#e8f0fa","--text-muted":"#8aa0bc","--text-faint":"#6a7f9a","--text-dim":"#4a5a72","--accent":"#22d3ee","--accent-contrast":"#061018","--accent-soft":"rgba(34,211,238,0.12)","--accent-bg":"rgba(34,211,238,0.06)","--accent-border":"rgba(34,211,238,0.25)","--success-soft":"rgba(94,234,212,0.15)","--success-bg":"rgba(94,234,212,0.04)","--success-border":"rgba(94,234,212,0.25)","--success-text":"#5eead4","--overlay":"rgba(8,16,26,0.82)","--nav-bg":"rgba(8,16,26,0.9)","--shadow":"rgba(0,0,0,0.6)","--day-vermilion":"#fb7185","--day-vermilion-soft":"rgba(251,113,133,0.12)","--day-amber":"#fbbf24","--day-amber-soft":"rgba(251,191,36,0.12)","--day-rose":"#f472b6","--day-rose-soft":"rgba(244,114,182,0.12)","--day-cyan":"#22d3ee","--day-cyan-soft":"rgba(34,211,238,0.12)","--day-emerald":"#34d399","--day-emerald-soft":"rgba(52,211,153,0.12)","--day-violet":"#a78bfa","--day-violet-soft":"rgba(167,139,250,0.12)","--day-slate":"#94a3b8","--day-slate-soft":"rgba(148,163,184,0.12)"
+    }},
+    forest: { name: "Forest", mode: "dark", icon: "moon", vars: {
+      "--bg":"#0a1410","--surface":"#11201a","--surface-alt":"#0c1814","--border":"#1f3529","--text":"#ecf5ee","--text-muted":"#8aa899","--text-faint":"#6a8878","--text-dim":"#4a6658","--accent":"#34d399","--accent-contrast":"#0a1410","--accent-soft":"rgba(52,211,153,0.12)","--accent-bg":"rgba(52,211,153,0.06)","--accent-border":"rgba(52,211,153,0.25)","--success-soft":"rgba(134,239,172,0.15)","--success-bg":"rgba(134,239,172,0.04)","--success-border":"rgba(134,239,172,0.25)","--success-text":"#86efac","--overlay":"rgba(10,20,16,0.82)","--nav-bg":"rgba(10,20,16,0.9)","--shadow":"rgba(0,0,0,0.55)","--day-vermilion":"#fb923c","--day-vermilion-soft":"rgba(251,146,60,0.12)","--day-amber":"#fbbf24","--day-amber-soft":"rgba(251,191,36,0.12)","--day-rose":"#fb7185","--day-rose-soft":"rgba(251,113,133,0.12)","--day-cyan":"#67e8f9","--day-cyan-soft":"rgba(103,232,249,0.12)","--day-emerald":"#34d399","--day-emerald-soft":"rgba(52,211,153,0.12)","--day-violet":"#c4b5fd","--day-violet-soft":"rgba(196,181,253,0.12)","--day-slate":"#94a3b8","--day-slate-soft":"rgba(148,163,184,0.12)"
+    }},
+    bloom: { name: "Bloom", mode: "light", icon: "sun", vars: {
+      "--bg":"#fdf4f5","--surface":"#ffffff","--surface-alt":"#fbe9ec","--border":"#efd4da","--text":"#1f0d12","--text-muted":"#7a5560","--text-faint":"#9a7882","--text-dim":"#c4a8b0","--accent":"#be185d","--accent-contrast":"#ffffff","--accent-soft":"rgba(190,24,93,0.1)","--accent-bg":"rgba(190,24,93,0.05)","--accent-border":"rgba(190,24,93,0.25)","--success-soft":"rgba(4,120,87,0.1)","--success-bg":"rgba(4,120,87,0.04)","--success-border":"rgba(4,120,87,0.25)","--success-text":"#047857","--overlay":"rgba(253,244,245,0.85)","--nav-bg":"rgba(253,244,245,0.92)","--shadow":"rgba(120,40,70,0.12)","--day-vermilion":"#dc2626","--day-vermilion-soft":"rgba(220,38,38,0.1)","--day-amber":"#b45309","--day-amber-soft":"rgba(180,83,9,0.1)","--day-rose":"#be185d","--day-rose-soft":"rgba(190,24,93,0.1)","--day-cyan":"#0e7490","--day-cyan-soft":"rgba(14,116,144,0.1)","--day-emerald":"#047857","--day-emerald-soft":"rgba(4,120,87,0.1)","--day-violet":"#7e22ce","--day-violet-soft":"rgba(126,34,206,0.1)","--day-slate":"#57534e","--day-slate-soft":"rgba(87,83,78,0.1)"
+    }}
+  };
+
+  // ============================================================
+  //  PROGRAM
+  // ============================================================
+  const PROGRAM = {
+    1: { name:"Push A", subtitle:"Chest Emphasis", color:"vermilion", volume:"22 working sets", exercises:[
+      {id:"p1-1",name:"Flat Barbell Bench Press",sets:4,reps:"6–8",rest:"2–3 min",rpe:"7–8",rir:"2–3",tempo:"2–3s eccentric",stretch:false,cues:"Retract scapulae, slight arch, bar to mid-chest under control. Full ROM loads pecs in the stretched position. Drive explosively through the feet."},
+      {id:"p1-2",name:"30° Incline Dumbbell Press",sets:3,reps:"8–10",rest:"2 min",rpe:"8",rir:"2",tempo:"Controlled 2s eccentric",stretch:true,cues:"30° incline maximizes upper pec activation. Let dumbbells sink deep at the bottom for stretch. Drive shoulders into bench."},
+      {id:"p1-3",name:"Low-to-High Cable Fly",sets:3,reps:"12–15",rest:"60–90s",rpe:"9",rir:"1",tempo:"Slow eccentric, 1s squeeze",stretch:true,cues:"Arms slightly behind torso at the bottom for maximum stretch. Constant cable tension provides stimulus that dumbbells lose at the top."},
+      {id:"p1-4",name:"Seated Dumbbell Shoulder Press",sets:3,reps:"8–10",rest:"2 min",rpe:"8",rir:"2",tempo:"Controlled",stretch:false,cues:"Highest anterior delt EMG of all exercises. Full ROM, press to near-lockout. Control the negative."},
+      {id:"p1-5",name:"Cable Lateral Raise",sets:3,reps:"12–15",rest:"60s",rpe:"9–10",rir:"0–1",tempo:"Strict, no swing",stretch:false,cues:"Slight forward lean, lead with elbows. Cable provides constant tension unlike dumbbells. Take last set to failure."},
+      {id:"p1-6",name:"Overhead Cable Tricep Extension",sets:3,reps:"10–12",rest:"60–90s",rpe:"8–9",rir:"1–2",tempo:"Controlled 2s eccentric",stretch:true,cues:"Shoulder-flexed position stretches the long head maximally. Elbows point forward, full stretch behind head."},
+      {id:"p1-7",name:"Hanging Knee Raise",sets:3,reps:"12–15",rest:"60s",rpe:"8–9",rir:"1–2",tempo:"Controlled, 1s pause at top",stretch:false,cues:"Lower abs emphasis. Initiate by posteriorly tilting the pelvis — knees come toward chest, hips curl up. Avoid swinging. Slow, controlled descent."}
+    ]},
+    2: { name:"Pull A", subtitle:"Back Width + Deadlift", color:"amber", volume:"25 working sets", exercises:[
+      {id:"p2-0",name:"Conventional Deadlift",sets:3,reps:"5",rest:"3 min",rpe:"7–8",rir:"2–3",tempo:"Controlled descent, no bounce",stretch:false,cues:"Bar over mid-foot, shins near bar. Hinge to grip, chest up, neutral spine, lats tight. Push the floor away — drive hips and knees simultaneously. Full hip extension at top (no hyperextension). Reset each rep ('dead' stop). Priority exercise: heavy posterior chain strength drives whole-body hypertrophy and transfers to RDLs, rows, squats."},
+      {id:"p2-1",name:"Weighted Pull-Up (Overhand)",sets:4,reps:"6–10",rest:"2–3 min",rpe:"7–8",rir:"2–3",tempo:"Controlled, full ROM",stretch:true,cues:"Highest lat EMG of any exercise. Dead hang at bottom for full stretch. Pull chest toward bar, initiate with lats."},
+      {id:"p2-2",name:"Barbell Bent-Over Row",sets:3,reps:"8–10",rest:"2 min",rpe:"8",rir:"2",tempo:"Controlled",stretch:false,cues:"45° torso angle, pull to lower chest/upper abdomen. Squeeze shoulder blades at top. Builds mid-back thickness."},
+      {id:"p2-3",name:"Seated Cable Row (V-Grip)",sets:3,reps:"10–12",rest:"90s",rpe:"8–9",rir:"1–2",tempo:"Full protraction + retraction",stretch:true,cues:"Allow shoulders to protract fully forward for lat stretch, then retract fully. Protraction-retraction through full ROM is critical."},
+      {id:"p2-4",name:"Face Pull",sets:3,reps:"15–20",rest:"60s",rpe:"8–9",rir:"1–2",tempo:"Pause at end",stretch:false,cues:"Rope to forehead level, externally rotate at end position. Targets rear delts and external rotators. Essential for shoulder health."},
+      {id:"p2-5",name:"Incline Dumbbell Curl (30–45°)",sets:3,reps:"10–12",rest:"60–90s",rpe:"8–9",rir:"1–2",tempo:"3s eccentric",stretch:true,cues:"Premier stretch-position biceps exercise. Shoulder extension places long head under max stretch. Elbows behind torso."},
+      {id:"p2-6",name:"EZ-Bar Curl",sets:3,reps:"8–10",rest:"60–90s",rpe:"9",rir:"1",tempo:"Controlled",stretch:false,cues:"EZ-bar activates biceps more than straight bar. Elbows pinned to sides, no swinging. Last set to failure."},
+      {id:"p2-7",name:"Plank (Weighted if Possible)",sets:3,reps:"45–60s",rest:"60s",rpe:"8",rir:"2",tempo:"Hold isometric",stretch:false,cues:"Isometric core stability — protects the spine under load. Forearms on floor, body in straight line from heels to head. Squeeze glutes, brace abs as if expecting a punch. Add plate on back once 60s feels easy."}
+    ]},
+    3: { name:"Legs A", subtitle:"Quad-Dominant", color:"rose", volume:"20 working sets", exercises:[
+      {id:"p3-1",name:"Barbell Back Squat (Full Depth)",sets:4,reps:"6–8",rest:"3 min",rpe:"7–8",rir:"2–3",tempo:"Controlled 2s eccentric",stretch:true,cues:"Hip crease below knee — deep squats equal more quad and glute hypertrophy. Chest up, knees track toes. Heeled shoes help depth."},
+      {id:"p3-2",name:"Leg Press (Feet Low & Narrow)",sets:3,reps:"10–12",rest:"2 min",rpe:"8–9",rir:"1–2",tempo:"Full ROM",stretch:true,cues:"Low foot placement shifts emphasis to quads. Full ROM — let knees come toward chest. Do not lock out at top."},
+      {id:"p3-3",name:"Leg Extension (Stretch Emphasis)",sets:3,reps:"12–15",rest:"60–90s",rpe:"9–10",rir:"0–1",tempo:"Slow eccentric",stretch:true,cues:"Bottom half produces up to 2× the quad growth as top half. Emphasize bottom range. Last set: failure + 3–4 lengthened partials."},
+      {id:"p3-4",name:"Seated Leg Curl",sets:3,reps:"10–12",rest:"90s",rpe:"8–9",rir:"1–2",tempo:"Controlled",stretch:true,cues:"Seated beats lying for hamstring hypertrophy. Hip-flexed position stretches hamstrings more. Flex hips forward at start."},
+      {id:"p3-5",name:"Standing Calf Raise",sets:4,reps:"10–15",rest:"60s",rpe:"9",rir:"1",tempo:"2–3s stretch, 3s eccentric",stretch:true,cues:"Standing beats seated for hypertrophy. Full dorsiflexion stretch at bottom, full contraction at top."},
+      {id:"p3-6",name:"Hanging Leg Raise",sets:3,reps:"10–15",rest:"60s",rpe:"8–9",rir:"1–2",tempo:"Controlled",stretch:false,cues:"Highest rectus abdominis activation when knees raised high enough to curl pelvis. Focus on spinal flexion."}
+    ]},
+    4: { name:"Push B", subtitle:"Shoulder Emphasis", color:"cyan", volume:"22 working sets", exercises:[
+      {id:"p4-1",name:"Barbell Overhead Press",sets:4,reps:"6–8",rest:"2–3 min",rpe:"7–8",rir:"2–3",tempo:"Controlled",stretch:false,cues:"Core braced, full ROM to lockout. Slight lean-back OK, excessive arch is not."},
+      {id:"p4-2",name:"30° Incline Dumbbell Press",sets:3,reps:"8–10",rest:"2 min",rpe:"8",rir:"2",tempo:"Controlled",stretch:true,cues:"Doubles as upper chest volume and shoulder assistance. Deep stretch at bottom. Drive shoulders into bench."},
+      {id:"p4-3",name:"Dumbbell Lateral Raise",sets:4,reps:"12–15",rest:"60s",rpe:"9–10",rir:"0–1",tempo:"Strict",stretch:false,cues:"Strict form non-negotiable. Slight forward lean, lead with elbows/pinkies. Last set to failure."},
+      {id:"p4-4",name:"High-to-Low Cable Fly",sets:3,reps:"12–15",rest:"60–90s",rpe:"9",rir:"1",tempo:"Slow eccentric",stretch:true,cues:"Targets mid/lower chest fibers. Let arms stretch wide behind the body at the bottom."},
+      {id:"p4-5",name:"EZ-Bar Skull Crusher",sets:3,reps:"10–12",rest:"90s",rpe:"8–9",rir:"1–2",tempo:"2s eccentric",stretch:true,cues:"Lower bar behind the head to stretch the long head. Arms angled slightly backward."},
+      {id:"p4-6",name:"Tricep Rope Pushdown",sets:2,reps:"12–15",rest:"60s",rpe:"9–10",rir:"0–1",tempo:"Squeeze at bottom",stretch:false,cues:"Targets lateral head. Lock elbows at sides, split the rope at the bottom. Both sets close to failure."},
+      {id:"p4-7",name:"Decline Sit-Up (Weighted)",sets:3,reps:"12–15",rest:"60s",rpe:"8–9",rir:"1–2",tempo:"Controlled 2s down",stretch:true,cues:"Upper ab emphasis with full ROM. Set decline at 30–45°. Hold a plate across the chest for progressive overload. Curl the torso up (flex the spine, do not just hip-flex). Lower slowly for stretch at bottom."}
+    ]},
+    5: { name:"Pull B", subtitle:"Back Thickness", color:"emerald", volume:"22 working sets", exercises:[
+      {id:"p5-1",name:"Chest-Supported Dumbbell Row",sets:4,reps:"8–10",rest:"2 min",rpe:"8",rir:"2",tempo:"Controlled, pause at top",stretch:false,cues:"Eliminates lower back fatigue, allows heavier loading for mid-back thickness. Full protraction at bottom."},
+      {id:"p5-2",name:"Wide-Grip Lat Pulldown",sets:3,reps:"10–12",rest:"90s",rpe:"8–9",rir:"1–2",tempo:"Controlled",stretch:true,cues:"Full stretch at top — let lats elongate completely. Pull to upper chest, lean back slightly."},
+      {id:"p5-3",name:"Single-Arm Dumbbell Row",sets:3,reps:"10–12",rest:"90s/arm",rpe:"8–9",rir:"1–2",tempo:"Controlled",stretch:false,cues:"Unilateral work corrects imbalances. Row to hip for lat emphasis. Full stretch at bottom."},
+      {id:"p5-4",name:"Reverse Pec Deck Fly",sets:3,reps:"12–15",rest:"60s",rpe:"9",rir:"1",tempo:"Squeeze at end",stretch:false,cues:"Higher rear delt activation than seated rows. 90° arm angle, external rotation at end."},
+      {id:"p5-5",name:"Preacher Curl (EZ-Bar)",sets:3,reps:"10–12",rest:"60–90s",rpe:"9",rir:"1",tempo:"Slow 3s eccentric",stretch:true,cues:"Biases the short head of the biceps. Full stretch at bottom. Complementary to incline curls."},
+      {id:"p5-6",name:"Hammer Curl",sets:3,reps:"10–12",rest:"60s",rpe:"9–10",rir:"0–1",tempo:"Controlled",stretch:false,cues:"Neutral grip maximizes brachioradialis activation. Also targets brachialis for arm width."},
+      {id:"p5-7",name:"Cable Woodchopper",sets:3,reps:"12/side",rest:"60s",rpe:"8–9",rir:"1–2",tempo:"Controlled, explosive concentric",stretch:false,cues:"Oblique and rotational core emphasis. Cable high, pull diagonally across the body to the opposite hip. Rotate from the torso (not just the arms). Essential for rotational strength and waist definition."}
+    ]},
+    6: { name:"Legs B", subtitle:"Posterior Chain + Abs", color:"violet", volume:"23 working sets", exercises:[
+      {id:"p6-1",name:"Romanian Deadlift",sets:4,reps:"8–10",rest:"2–3 min",rpe:"7–8",rir:"2–3",tempo:"2–3s eccentric",stretch:true,cues:"Premier hamstring stretch. Hinge at hips, neutral spine, feel deep stretch, bar close to legs."},
+      {id:"p6-2",name:"Bulgarian Split Squat",sets:3,reps:"8–10/leg",rest:"90s",rpe:"8–9",rir:"1–2",tempo:"Controlled 2s eccentric",stretch:true,cues:"Deep stretch at bottom for quads and glutes. Long stride = more glute. Forward lean increases glute activation."},
+      {id:"p6-3",name:"Seated Leg Curl",sets:3,reps:"10–12",rest:"90s",rpe:"9",rir:"1",tempo:"Controlled",stretch:true,cues:"Second hamstring session this week. Same stretch-emphasis cues. Final set to failure."},
+      {id:"p6-4",name:"Leg Extension",sets:3,reps:"12–15",rest:"60–90s",rpe:"9–10",rir:"0–1",tempo:"Slow eccentric",stretch:true,cues:"Maintains quad volume on hamstring-focused day. Stretch-emphasis at bottom."},
+      {id:"p6-5",name:"Seated Calf Raise",sets:4,reps:"12–20",rest:"60s",rpe:"9",rir:"1",tempo:"Pause at bottom and top",stretch:true,cues:"Targets the soleus (knee bent). Higher reps respond well to slow-twitch fibers."},
+      {id:"p6-6",name:"Ab Wheel Rollout",sets:3,reps:"8–12",rest:"60s",rpe:"8–9",rir:"1–2",tempo:"Slow extension",stretch:false,cues:"Highest rectus abdominis activation of all ab exercises. Start from knees, extend fully."},
+      {id:"p6-7",name:"Cable Crunch",sets:3,reps:"12–15",rest:"60s",rpe:"9",rir:"1",tempo:"Squeeze at bottom",stretch:false,cues:"Loaded spinal flexion. Curl ribcage toward pelvis, not hip flexion."}
+    ]},
+    7: { name:"Rest Day", subtitle:"Recovery", color:"slate", volume:"Light walking only", exercises:[] }
+  };
+
+  const MEAL_PLANS = {
+    morning: [
+      {id:"m1",time:"5:30 AM",name:"Pre-Workout",tag:"30–45 min before lifting",totals:{kcal:280,p:25,c:40,f:2},items:["1 scoop whey in 200 ml water","1 banana","2 Medjool dates","Black coffee (optional)"],note:"Light carbs + protein. Fasted lifting risks strength loss and muscle breakdown — even a small pre-workout meal preserves performance and MPS."},
+      {id:"m2",time:"Post-Workout",name:"Post-Workout Breakfast",tag:"Within 30 min of finishing",totals:{kcal:780,p:62,c:90,f:18},items:["2 scoops whey + 250 ml milk","3 whole eggs (scrambled)","100 g dry oats (cooked, ~⅔ cup)","1 banana","15 g almonds"],note:"Largest carb dose of the day refills muscle glycogen post-training. 50 g+ protein hits the leucine threshold for max MPS."},
+      {id:"m3",time:"11:00 AM",name:"Mid-Morning",totals:{kcal:554,p:35,c:79,f:14},items:["1 scoop whey","250 ml milk","1 apple","2 Medjool dates","10 g cashews"]},
+      {id:"m4",time:"2:00 PM",name:"Lunch",totals:{kcal:830,p:32,c:120,f:25},items:["2 egg omelette","250 g curd (dahi)","100 g dry rice (cooked, ~1.5 cups)","200 g vegetables","10 g walnuts","15 g raisins"]},
+      {id:"m5",time:"5:30 PM",name:"Snack",totals:{kcal:445,p:30,c:60,f:10},items:["1 scoop whey","250 ml milk","1 banana","10 g almonds"]},
+      {id:"m6",time:"8:30 PM",name:"Dinner",totals:{kcal:540,p:35,c:60,f:18},items:["3 whole eggs + 2 whites","150 g curd","60 g dry rice or 1 chapati","Vegetables"]},
+      {id:"m7",time:"10:30 PM",name:"Pre-Sleep",tag:"30 min before bed",totals:{kcal:412,p:44,c:11,f:22},items:["150 g curd (casein-rich)","1 scoop whey (mixed in curd)","2 boiled eggs","10 g almonds"],note:"Pre-sleep protein ↑ overnight MPS ~22% (Snijders 2015)"}
+    ],
+    evening: [
+      {id:"m1",time:"7:00 AM",name:"Breakfast",totals:{kcal:626,p:45,c:45,f:31},items:["3 whole eggs (boiled)","4 egg whites","250 ml whole milk","1 banana","15 g almonds"]},
+      {id:"m2",time:"10:00 AM",name:"Mid-Morning",totals:{kcal:554,p:35,c:79,f:14},items:["1 scoop whey","250 ml milk","1 apple","2 Medjool dates","10 g cashews"]},
+      {id:"m3",time:"1:00 PM",name:"Lunch",totals:{kcal:614,p:27,c:76,f:25},items:["2 egg omelette","250 g curd (dahi)","2 bananas","10 g walnuts","15 g raisins"],note:"Add 100 g dry rice + 200 g vegetables to hit carb target."},
+      {id:"m4",time:"4:30 PM",name:"Pre-Workout",tag:"60–90 min before training",totals:{kcal:509,p:34,c:78,f:10},items:["1 scoop whey","250 ml milk","1 banana","2 Medjool dates","Optional: 200 mg caffeine (cutoff: 6 hrs before bed)"],note:"Larger pre-workout meal vs morning — you've been fueled all day, can handle more carbs to peak energy."},
+      {id:"m5",time:"Post-Workout",name:"Post-Workout",tag:"Within 30–60 min of finishing",totals:{kcal:495,p:57,c:45,f:11},items:["2 scoops whey","250 ml milk","1 banana"],note:"40–50 g protein dose maximizes MPS (Macnaughton 2016)"},
+      {id:"m6",time:"9:30 PM",name:"Dinner",totals:{kcal:490,p:30,c:60,f:15},items:["3 whole eggs","100 g dry oats","100 ml milk","Vegetables"],note:"Lighter dinner — large meals close to bed disrupt sleep quality."},
+      {id:"m7",time:"10:30 PM",name:"Pre-Sleep",tag:"30 min before bed",totals:{kcal:412,p:44,c:11,f:22},items:["150 g curd (casein-rich)","1 scoop whey (mixed in curd)","2 boiled eggs","10 g almonds"],note:"Pre-sleep protein ↑ overnight MPS ~22% (Snijders 2015)"}
+    ]
+  };
+
+  const SESSION_GUIDE = {
+    morning: {
+      label: "Morning Session",
+      sub: "5:30 – 7:30 AM training window",
+      points: [
+        {t:"Wake-up routine", d:"Wake 60 min before lifting. Drink 500 ml water with a pinch of salt immediately on waking — you're dehydrated after 7+ hours."},
+        {t:"Extended warm-up", d:"Cold joints + stiff fascia in the morning. Add 5 min of dynamic stretching (leg swings, arm circles, hip openers) + 2 extra warm-up sets per compound. Skipping this is the #1 morning injury cause."},
+        {t:"Pre-workout fuel", d:"Quick-digesting carbs + 25 g protein 30–45 min before training. Avoid fats and fibre — they slow digestion and cause GI distress under heavy load."},
+        {t:"Caffeine timing", d:"Black coffee or 100–200 mg caffeine pre-workout is fine — fully cleared before bed."},
+        {t:"Post-workout window", d:"Eat your largest meal within 30 min of finishing. Glycogen resynthesis is most efficient in this window after a fasted/semi-fasted lift."},
+        {t:"Strength expectation", d:"Morning strength is typically 5–10% lower than evening (lower core body temp, lower CNS arousal). Don't chase PRs in the first 4 weeks of switching to mornings — let your body adapt."}
+      ]
+    },
+    evening: {
+      label: "Evening Session",
+      sub: "5:30 – 7:30 PM training window",
+      points: [
+        {t:"Hydration through the day", d:"Aim for 2.5 L water before training starts. Add electrolytes (pinch of salt + lemon) to the pre-workout shake if you sweat heavily."},
+        {t:"Pre-workout meal", d:"Eat 60–90 min before lifting — enough digestion time to avoid GI issues but close enough for energy. Larger meal than morning since you've been eating all day."},
+        {t:"Caffeine cutoff", d:"If using caffeine, take it BEFORE 1:30 PM — caffeine has a 5–6 hour half-life and will tank sleep quality if taken close to evening training."},
+        {t:"Strength advantage", d:"You'll typically be 5–10% stronger than morning sessions. Best window for PR attempts and heavy compound work."},
+        {t:"Sleep buffer", d:"Finish training by 7:30 PM. Late lifting elevates core temperature and cortisol — both delay sleep onset. If you must lift later, take a warm shower 60 min before bed to drop core temp."},
+        {t:"Lighter dinner", d:"Eat dinner ~2 hours before bed and keep it moderate. Heavy meals close to sleep impair growth hormone release and recovery."}
+      ]
+    }
+  };
+
+  const TARGETS = {kcal:3300,p:168,c:413,f:88};
+  const SUPPS = [
+    {name:"Creatine Monohydrate",dose:"3–5 g/day",note:"No loading needed — most evidence-backed supplement"},
+    {name:"Vitamin D3",dose:"2,000–4,000 IU",note:"Supports testosterone, bone, immune function"},
+    {name:"Omega-3 (EPA+DHA)",dose:"2–3 g combined",note:"Anti-inflammatory, recovery support"},
+    {name:"Magnesium Glycinate",dose:"200–400 mg before bed",note:"Sleep quality, muscle recovery"}
+  ];
+
+  // ============================================================
+  //  STATE
+  // ============================================================
+  const state = {
+    tab: 'today',
+    day: (new Date().getDay() || 7),
+    sessions: {},
+    meals: {},
+    history: {},
+    bodyWeight: {},
+    theme: 'ember',
+    sessionTime: 'morning', // 'morning' or 'evening'
+    rest: null, // {duration, remaining, running}
+    picker: false,
+    expanded: {},
+    weightInput: ''
+  };
+
+  // ============================================================
+  //  HELPERS
+  // ============================================================
+  const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const todayKey = () => new Date().toISOString().slice(0,10);
+  const sessionKey = () => `${todayKey()}:day${state.day}`;
+  const getSession = () => state.sessions[sessionKey()] || {};
+  const setSessionLog = (log) => {
+    state.sessions[sessionKey()] = log;
+    state.history[todayKey()] = log;
+    save();
+  };
+  const parseRest = (str) => {
+    const m = str.match(/(\d+)(?:[–-](\d+))?\s*(min|s)/);
+    if (!m) return 90;
+    const lo = +m[1], hi = m[2] ? +m[2] : lo;
+    const avg = (lo + hi) / 2;
+    return m[3] === 'min' ? Math.round(avg * 60) : Math.round(avg);
+  };
+  const dayAccent = (c) => ({accent: `var(--day-${c})`, soft: `var(--day-${c}-soft)`});
+  const getSetsFor = (ex) => {
+    const log = getSession()[ex.id];
+    if (log && log.sets && log.sets.length === ex.sets) return log.sets;
+    return Array(ex.sets).fill(null).map(() => ({weight:'',reps:'',done:false}));
+  };
+
+  function save() {
+    try {
+      localStorage.setItem('hyp-tracker', JSON.stringify({
+        sessions: state.sessions,
+        meals: state.meals,
+        history: state.history,
+        bodyWeight: state.bodyWeight,
+        theme: state.theme,
+        sessionTime: state.sessionTime
+      }));
+    } catch(e) { console.warn('save failed', e); }
+  }
+  function load() {
+    try {
+      const s = JSON.parse(localStorage.getItem('hyp-tracker') || '{}');
+      if (s.sessions) state.sessions = s.sessions;
+      if (s.meals) state.meals = s.meals;
+      if (s.history) state.history = s.history;
+      if (s.bodyWeight) state.bodyWeight = s.bodyWeight;
+      if (s.theme && THEMES[s.theme]) state.theme = s.theme;
+      if (s.sessionTime === 'morning' || s.sessionTime === 'evening') state.sessionTime = s.sessionTime;
+    } catch(e) { console.warn('load failed', e); }
+  }
+
+  function applyTheme() {
+    const t = THEMES[state.theme];
+    const root = document.documentElement;
+    Object.entries(t.vars).forEach(([k,v]) => root.style.setProperty(k, v));
+  }
+
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value = 880; g.gain.value = 0.1;
+      o.start(); setTimeout(() => { o.stop(); ctx.close(); }, 400);
+    } catch {}
+  }
+
+  // ============================================================
+  //  RENDER
+  // ============================================================
+  function render() {
+    applyTheme();
+    const app = document.getElementById('app');
+    const activeEl = document.activeElement;
+    const focusInfo = activeEl && activeEl.dataset && activeEl.dataset.input
+      ? {input: activeEl.dataset.input, ex: activeEl.dataset.ex, i: activeEl.dataset.i, field: activeEl.dataset.field, sel: activeEl.selectionStart}
+      : null;
+
+    app.innerHTML = renderApp();
+
+    if (focusInfo) {
+      const sel = `[data-input="${focusInfo.input}"][data-ex="${focusInfo.ex||''}"][data-i="${focusInfo.i||''}"][data-field="${focusInfo.field||''}"]`;
+      const el = document.querySelector(sel);
+      if (el) { el.focus(); try { el.setSelectionRange(focusInfo.sel, focusInfo.sel); } catch {} }
+    } else if (activeEl && activeEl.id === 'bw-input') {
+      const el = document.getElementById('bw-input');
+      if (el) el.focus();
+    }
+  }
+
+  function renderApp() {
+    return [
+      renderHeader(),
+      '<div class="content">',
+        renderTab(),
+      '</div>',
+      state.rest ? renderTimer() : '',
+      state.picker ? renderPicker() : '',
+      renderNav()
+    ].join('');
+  }
+
+  function renderHeader() {
+    const d = new Date();
+    return `
+      <div class="header">
+        <div class="header-inner">
+          <div class="brand">
+            <div class="brand-icon">${I.flame(16)}</div>
+            <div>
+              <div class="brand-text-top">Hypertrophy</div>
+              <div class="brand-text-bot">80 KG · 5'10"</div>
+            </div>
+          </div>
+          <div class="header-right">
+            <button class="icon-btn" data-action="open-picker" aria-label="Theme">${I.palette(16)}</button>
+            <div class="date-stack">
+              <div class="date-top">${d.toLocaleDateString('en-US',{weekday:'short'})}</div>
+              <div class="date-bot">${d.toLocaleDateString('en-US',{month:'short',day:'numeric'})}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderTab() {
+    if (state.tab === 'today') return renderToday();
+    if (state.tab === 'program') return renderProgram();
+    if (state.tab === 'nutrition') return renderNutrition();
+    if (state.tab === 'progress') return renderProgress();
+    return '';
+  }
+
+  function renderToday() {
+    const day = PROGRAM[state.day];
+    const accent = dayAccent(day.color);
+    const session = getSession();
+
+    let totalSets = 0, doneSets = 0, doneEx = 0;
+    day.exercises.forEach(ex => {
+      totalSets += ex.sets;
+      const sets = (session[ex.id] && session[ex.id].sets) || [];
+      const d = sets.filter(s => s.done).length;
+      doneSets += d;
+      if (d === ex.sets && ex.sets > 0) doneEx++;
+    });
+    const pct = totalSets ? (doneSets / totalSets * 100) : 0;
+
+    const pills = [1,2,3,4,5,6,7].map(d => {
+      const p = PROGRAM[d];
+      const c = dayAccent(p.color);
+      const active = d === state.day;
+      const style = active
+        ? `background: ${c.accent}; color: var(--accent-contrast); border: none;`
+        : '';
+      return `<button class="day-pill ${active?'active':''}" style="${style}" data-action="set-day" data-day="${d}">
+        <div class="day-pill-top">Day ${d}</div>
+        <div class="day-pill-bot">${esc(p.name)}</div>
+      </button>`;
+    }).join('');
+
+    const exercises = day.exercises.map((ex, i) => renderExCard(ex, i, accent, session)).join('');
+
+    const restDay = state.day === 7 ? `
+      <div class="rest-card">
+        <div style="color: var(--day-slate); display: flex; justify-content: center;">${I.droplet(32)}</div>
+        <div class="rest-title">Recovery Day</div>
+        <div class="rest-text">Light walking, sleep 8+ hours, hydrate 3–4 L, eat to target. Growth happens here.</div>
+      </div>
+    ` : '';
+
+    return `
+      <div class="day-pills scroll-x">
+        <div class="day-pill-row">${pills}</div>
+      </div>
+      <div class="hero">
+        <div class="hero-blur" style="background: ${accent.accent};"></div>
+        <div class="hero-content">
+          <div class="hero-head">
+            <div>
+              <div class="hero-subtitle" style="color: ${accent.accent};">${esc(day.subtitle)}</div>
+              <h1 class="hero-title">${esc(day.name)}</h1>
+            </div>
+            <div class="hero-badge" style="background: ${accent.soft}; color: ${accent.accent};">${I.dumbbell(22)}</div>
+          </div>
+          <div style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; background: var(--surface-alt); border: 1px solid var(--border); margin-bottom: 16px;">
+            <span style="color: var(--accent);">${state.sessionTime === 'morning' ? I.sun(12) : I.moon(12)}</span>
+            <span style="font-family: 'JetBrains Mono', monospace; font-size: 10px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--text-muted);">${state.sessionTime} session</span>
+          </div>
+          <div class="hero-stats">
+            <div>
+              <div class="stat-num">${doneSets}<span>/${totalSets}</span></div>
+              <div class="stat-label">Sets Done</div>
+            </div>
+            <div>
+              <div class="stat-num">${doneEx}<span>/${day.exercises.length}</span></div>
+              <div class="stat-label">Exercises</div>
+            </div>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${pct}%; background: ${accent.accent};"></div>
+          </div>
+        </div>
+      </div>
+      ${restDay}
+      <div class="ex-list">${exercises}</div>
+    `;
+  }
+
+  function renderExCard(ex, idx, accent, session) {
+    const log = session[ex.id];
+    const sets = (log && log.sets && log.sets.length === ex.sets)
+      ? log.sets
+      : Array(ex.sets).fill(null).map(() => ({weight:'',reps:'',done:false}));
+    const doneCount = sets.filter(s => s.done).length;
+    const allDone = doneCount === ex.sets;
+    const expanded = !!state.expanded[ex.id];
+
+    const badgeStyle = allDone
+      ? `background: var(--success-soft); color: var(--success-text);`
+      : `background: ${accent.soft}; color: ${accent.accent};`;
+
+    const tag = ex.stretch ? `<span class="ex-tag">STRETCH</span>` : '';
+
+    const body = expanded ? `
+      <div class="ex-body">
+        <div class="cues" style="border-left: 2px solid ${accent.accent};">
+          <div class="cues-label" style="color: ${accent.accent};">${I.info(11)} Form Cues</div>
+          <div class="cues-text">${esc(ex.cues)}</div>
+        </div>
+        <div class="tempo-row">
+          <div class="tempo-item">${I.timer(12)} ${esc(ex.tempo)}</div>
+          <div class="tempo-item">RIR ${esc(ex.rir)}</div>
+        </div>
+        <div>
+          <div class="set-grid-head">
+            <div>Set</div><div>Weight (kg)</div><div>Reps</div><div></div>
+          </div>
+          ${sets.map((s, i) => `
+            <div class="set-row">
+              <div class="set-num">${String(i+1).padStart(2,'0')}</div>
+              <input type="number" inputmode="decimal" class="themed-input" placeholder="—"
+                value="${esc(s.weight)}"
+                data-input="set" data-ex="${ex.id}" data-i="${i}" data-field="weight"/>
+              <input type="number" inputmode="numeric" class="themed-input" placeholder="—"
+                value="${esc(s.reps)}"
+                data-input="set" data-ex="${ex.id}" data-i="${i}" data-field="reps"/>
+              <button class="set-check ${s.done?'done':''}"
+                data-action="toggle-set" data-ex="${ex.id}" data-i="${i}" data-rest="${esc(ex.rest)}">
+                ${I.check(16)}
+              </button>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    ` : '';
+
+    return `
+      <div class="ex-card ${allDone?'done':''}">
+        <button class="ex-head" data-action="toggle-expand" data-id="${ex.id}">
+          <div class="ex-badge" style="${badgeStyle}">
+            ${allDone ? I.check(18) : String(idx+1).padStart(2,'0')}
+          </div>
+          <div class="ex-info">
+            <div class="ex-titlerow">
+              <span class="ex-title">${esc(ex.name)}</span>
+              ${tag}
+            </div>
+            <div class="ex-meta">
+              <span>${ex.sets} × ${esc(ex.reps)}</span><span>·</span>
+              <span>RPE ${esc(ex.rpe)}</span><span>·</span>
+              <span>${esc(ex.rest)}</span>
+            </div>
+          </div>
+          <div class="ex-right">
+            <div class="ex-count">${doneCount}/${ex.sets}</div>
+            <div class="ex-chev ${expanded?'open':''}">${I.chevron(16)}</div>
+          </div>
+        </button>
+        ${body}
+      </div>
+    `;
+  }
+
+  function renderProgram() {
+    const days = [1,2,3,4,5,6].map(d => {
+      const p = PROGRAM[d];
+      const c = dayAccent(p.color);
+      const exs = p.exercises.map(ex => `
+        <div class="prog-ex">
+          <div class="prog-ex-name">
+            ${ex.stretch ? `<span style="color: ${c.accent};">◆</span>` : ''}
+            <span>${esc(ex.name)}</span>
+          </div>
+          <span class="prog-ex-sets">${ex.sets}×${esc(ex.reps)}</span>
+        </div>
+      `).join('');
+      return `
+        <div class="card">
+          <div class="prog-day-head">
+            <div class="prog-day-num" style="background: ${c.soft}; color: ${c.accent};">0${d}</div>
+            <div style="flex:1">
+              <div class="prog-subtitle" style="color: ${c.accent};">${esc(p.subtitle)}</div>
+              <div class="prog-name">${esc(p.name)}</div>
+            </div>
+            <div class="prog-volume">${esc(p.volume)}</div>
+          </div>
+          <div class="prog-ex-list">${exs}</div>
+        </div>
+      `;
+    }).join('');
+
+    const principles = [
+      {t:"Double Progression", d:"Add reps until you hit the top of the range on all sets, then increase weight 2.5 kg (upper) / 5 kg (lower)."},
+      {t:"RIR Progression", d:"Wk 1: 3–4 RIR · Wk 2: 2–3 · Wk 3: 1–2 · Wk 4: 0–1 · Wk 5: deload (40–60% volume cut)."},
+      {t:"Compounds vs Isolations", d:"Heavy compounds: 2–3 RIR. Isolations: take last set to true failure."},
+      {t:"Stretch Emphasis ◆", d:"Lengthened-position loading drives disproportionate growth (2023–2025 research)."}
+    ].map(p => `
+      <div class="card" style="padding: 14px;">
+        <div style="font-family: 'Fraunces', serif; font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 4px;">${esc(p.t)}</div>
+        <div style="font-size: 12px; line-height: 1.5; color: var(--text-muted);">${esc(p.d)}</div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="page-head">
+        <div class="page-eyebrow">6-Day Split · PPL × 2</div>
+        <h1 class="page-title">The Program</h1>
+        <p class="page-lede">Each muscle trained twice weekly at 16–20 sets. Compounds at RPE 7–8. Isolations to failure. Ramp volume over 4–5 weeks, then deload.</p>
+      </div>
+      <div class="prog-list">${days}</div>
+      <div style="padding: 24px 16px 0;">
+        <div class="section-label">Training Principles</div>
+        <div class="stack-2" style="display: flex; flex-direction: column; gap: 8px;">${principles}</div>
+      </div>
+    `;
+  }
+
+  function renderNutrition() {
+    const plan = MEAL_PLANS[state.sessionTime];
+    const guide = SESSION_GUIDE[state.sessionTime];
+    const mealsToday = state.meals[todayKey()] || {};
+    const consumed = plan.reduce((acc, m) => {
+      if (mealsToday[m.id]) {
+        return {kcal:acc.kcal+m.totals.kcal, p:acc.p+m.totals.p, c:acc.c+m.totals.c, f:acc.f+m.totals.f};
+      }
+      return acc;
+    }, {kcal:0,p:0,c:0,f:0});
+
+    const macroBar = (label, val, target, colorVar) => {
+      const pct = Math.min(100, val/target*100);
+      const over = val > target;
+      return `
+        <div>
+          <div class="macro-row-head">
+            <span class="macro-row-label">${label}</span>
+            <span class="macro-row-num">
+              <span style="color: ${over?'var(--accent)':'var(--text)'};">${val}</span><span style="color: var(--text-dim);">/${target}</span>
+            </span>
+          </div>
+          <div class="macro-bar">
+            <div class="macro-fill" style="width: ${pct}%; background: var(${colorVar});"></div>
+          </div>
+        </div>
+      `;
+    };
+
+    const sessionToggle = `
+      <div style="padding: 0 16px 20px;">
+        <div style="display: flex; gap: 8px; padding: 4px; background: var(--surface); border: 1px solid var(--border); border-radius: 14px;">
+          ${['morning','evening'].map(m => {
+            const active = state.sessionTime === m;
+            const ic = m === 'morning' ? I.sun(14) : I.moon(14);
+            return `<button data-action="set-session" data-session="${m}"
+              style="flex:1; padding: 10px; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 8px;
+                background: ${active ? 'var(--accent)' : 'transparent'};
+                color: ${active ? 'var(--accent-contrast)' : 'var(--text-muted)'};
+                font-family: 'JetBrains Mono', monospace; font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; font-weight: 500; transition: all .15s;">
+              ${ic}<span>${m}</span>
+            </button>`;
+          }).join('')}
+        </div>
+      </div>
+    `;
+
+    const sessionGuide = `
+      <div style="padding: 0 16px 20px;">
+        <div class="card-lg">
+          <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px;">
+            <div>
+              <div class="page-eyebrow" style="margin-bottom: 4px;">${esc(guide.label)}</div>
+              <div style="font-family: 'Fraunces', serif; font-style: italic; font-size: 22px; color: var(--text);">Session Guide</div>
+              <div style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--text-muted); margin-top: 4px;">${esc(guide.sub)}</div>
+            </div>
+            <div style="width: 44px; height: 44px; border-radius: 12px; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center;">
+              ${state.sessionTime === 'morning' ? I.sun(20) : I.moon(20)}
+            </div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            ${guide.points.map(p => `
+              <div style="padding: 10px 12px; border-left: 2px solid var(--accent); background: var(--surface-alt); border-radius: 8px;">
+                <div style="font-family: 'Fraunces', serif; font-size: 13px; font-weight: 500; color: var(--text); margin-bottom: 3px;">${esc(p.t)}</div>
+                <div style="font-size: 12px; line-height: 1.5; color: var(--text-muted);">${esc(p.d)}</div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      </div>
+    `;
+
+    const meals = plan.map(m => {
+      const eaten = !!mealsToday[m.id];
+      const cardStyle = eaten
+        ? 'background: var(--success-bg); border: 1px solid var(--success-border);'
+        : 'background: var(--surface); border: 1px solid var(--border);';
+      const btnStyle = eaten
+        ? 'background: var(--success-soft); border: 1px solid var(--success-border); color: var(--success-text);'
+        : 'background: var(--surface-alt); border: 1px solid var(--border); color: var(--text-faint);';
+      const isWorkoutMeal = m.name.toLowerCase().includes('workout') || m.name.toLowerCase().includes('post');
+      const tagStyle = isWorkoutMeal
+        ? 'background: var(--accent-soft); color: var(--accent); padding: 2px 6px; border-radius: 4px; margin-left: 6px;'
+        : '';
+      return `
+        <div style="${cardStyle} border-radius: 16px; overflow: hidden;">
+          <div style="padding: 16px;">
+            <div class="meal-head">
+              <div style="flex: 1; min-width: 0;">
+                <div class="meal-time">${esc(m.time)}${m.tag ? ` · <span style="${tagStyle}">${esc(m.tag)}</span>` : ''}</div>
+                <div class="meal-name">${esc(m.name)}</div>
+              </div>
+              <button style="${btnStyle} width: 40px; height: 40px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;"
+                data-action="toggle-meal" data-id="${m.id}">
+                ${I.check(16)}
+              </button>
+            </div>
+            <div class="meal-totals">
+              <div><div class="meal-total-num">${m.totals.kcal}</div><div class="meal-total-lbl">kcal</div></div>
+              <div><div class="meal-total-num">${m.totals.p}</div><div class="meal-total-lbl">P</div></div>
+              <div><div class="meal-total-num">${m.totals.c}</div><div class="meal-total-lbl">C</div></div>
+              <div><div class="meal-total-num">${m.totals.f}</div><div class="meal-total-lbl">F</div></div>
+            </div>
+            <ul class="meal-items">
+              ${m.items.map(it => `<li class="meal-item"><span style="color: var(--text-dim);">—</span>${esc(it)}</li>`).join('')}
+            </ul>
+            ${m.note ? `<div class="meal-note">${esc(m.note)}</div>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    const supps = SUPPS.map(s => `
+      <div class="supp-row">
+        <div class="supp-icon">${I.droplet(14)}</div>
+        <div style="flex:1">
+          <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px;">
+            <div class="supp-name">${esc(s.name)}</div>
+            <div class="supp-dose">${esc(s.dose)}</div>
+          </div>
+          <div class="supp-note">${esc(s.note)}</div>
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="page-head">
+        <div class="page-eyebrow">Daily Fuel · 80 kg</div>
+        <h1 class="page-title">Nutrition</h1>
+      </div>
+      ${sessionToggle}
+      <div style="padding: 0 16px 20px;">
+        <div class="card-lg">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 20px;">
+            <div>
+              <div class="macro-big">${consumed.kcal}</div>
+              <div class="macro-label">of ${TARGETS.kcal} kcal target</div>
+            </div>
+            <div class="macro-label">${TARGETS.kcal - consumed.kcal > 0 ? `${TARGETS.kcal - consumed.kcal} left` : 'complete'}</div>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 12px;">
+            ${macroBar('Protein (g)', consumed.p, TARGETS.p, '--day-vermilion')}
+            ${macroBar('Carbs (g)', consumed.c, TARGETS.c, '--day-amber')}
+            ${macroBar('Fat (g)', consumed.f, TARGETS.f, '--day-emerald')}
+          </div>
+        </div>
+      </div>
+      ${sessionGuide}
+      <div style="padding: 0 16px 16px;">
+        <div class="section-label">Meal Schedule · ${guide.label}</div>
+      </div>
+      <div class="meal-list">${meals}</div>
+      <div style="padding: 24px 16px 0;">
+        <div class="section-label">Evidence-Backed Supplements</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">${supps}</div>
+      </div>
+    `;
+  }
+
+  function renderProgress() {
+    const totalSessions = Object.keys(state.history).length;
+    const now = new Date();
+    const last7 = Object.entries(state.history).filter(([d]) => (now - new Date(d)) / 86400000 <= 7);
+    const weekSets = last7.reduce((sum, [, log]) => sum + Object.values(log).reduce((s, ex) => s + (ex.sets ? ex.sets.filter(set => set.done).length : 0), 0), 0);
+
+    const bwEntries = Object.entries(state.bodyWeight).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 10);
+    const bwRows = bwEntries.length > 0 ? bwEntries.map(([d, w]) => `
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 14px; font-family: 'JetBrains Mono', monospace;">
+        <span style="color: var(--text-muted);">${new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric'})}</span>
+        <span style="color: var(--text); font-variant-numeric: tabular-nums;">${w} kg</span>
+      </div>
+    `).join('') : `<div style="font-size: 12px; text-align: center; padding: 12px 0; color: var(--text-faint);">Start logging to see your trend</div>`;
+
+    const histRows = Object.keys(state.history).length === 0 ? `
+      <div class="empty-card">
+        <div style="color: var(--text-dim); display: flex; justify-content: center;">${I.award(24)}</div>
+        <div class="empty-text">Your completed sessions will appear here</div>
+      </div>
+    ` : Object.entries(state.history).sort((a,b) => b[0].localeCompare(a[0])).slice(0,14).map(([d, log]) => {
+      const sets = Object.values(log).reduce((s, ex) => s + (ex.sets ? ex.sets.filter(set => set.done).length : 0), 0);
+      const total = Object.values(log).reduce((s, ex) => s + (ex.sets ? ex.sets.length : 0), 0);
+      return `
+        <div class="history-row">
+          <div>
+            <div class="history-date">${new Date(d).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})}</div>
+            <div class="history-sets">${sets} sets completed</div>
+          </div>
+          <div class="history-pct">${total ? Math.round(sets/total*100) : 0}%</div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="page-head">
+        <div class="page-eyebrow">Tracking</div>
+        <h1 class="page-title">Progress</h1>
+      </div>
+      <div class="stat-grid">
+        <div class="card">
+          <div style="color: var(--accent);">${I.activity(16)}</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size: 28px; font-weight: 300; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 12px;">${totalSessions}</div>
+          <div class="stat-label">Total Sessions</div>
+        </div>
+        <div class="card">
+          <div style="color: var(--day-amber);">${I.bar(16)}</div>
+          <div style="font-family:'JetBrains Mono',monospace; font-size: 28px; font-weight: 300; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 12px;">${weekSets}</div>
+          <div class="stat-label">Sets This Week</div>
+        </div>
+      </div>
+      <div style="padding: 0 16px 24px;">
+        <div class="section-label">Body Weight · Target 0.4–0.6 kg/month</div>
+        <div class="card">
+          <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+            <input type="number" inputmode="decimal" step="0.1" id="bw-input" class="themed-input"
+              placeholder="Today's weight (kg)" value="${esc(state.weightInput)}"
+              style="flex:1; padding: 12px 16px; border-radius: 12px;"
+              data-input="bw"/>
+            <button data-action="log-weight" style="padding: 12px 20px; border-radius: 12px; font-weight: 500; background: var(--accent); color: var(--accent-contrast);">Log</button>
+          </div>
+          <div>${bwRows}</div>
+        </div>
+      </div>
+      <div style="padding: 0 16px;">
+        <div class="section-label">Recent Sessions</div>
+        <div style="display: flex; flex-direction: column; gap: 8px;">${histRows}</div>
+      </div>
+    `;
+  }
+
+  function renderTimer() {
+    const r = state.rest;
+    const mins = Math.floor(r.remaining / 60);
+    const secs = r.remaining % 60;
+    const pct = ((r.duration - r.remaining) / r.duration) * 100;
+    return `
+      <div class="timer slide-up">
+        <div class="timer-track"><div class="timer-fill" style="width: ${pct}%;"></div></div>
+        <div class="timer-body">
+          <div class="timer-info">
+            <div class="timer-label">Rest</div>
+            <div class="timer-time">${mins}:${String(secs).padStart(2,'0')}</div>
+          </div>
+          <button class="timer-btn timer-btn-primary" data-action="timer-toggle">${r.running ? I.pause(18) : I.play(18)}</button>
+          <button class="timer-btn timer-btn-secondary" data-action="timer-reset">${I.rotate(18)}</button>
+          <button class="timer-btn timer-btn-secondary" data-action="timer-close">${I.x(18)}</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderPicker() {
+    const options = Object.entries(THEMES).map(([id, t]) => {
+      const active = id === state.theme;
+      const icon = t.icon === 'sun' ? I.sun(14) : t.icon === 'moon' ? I.moon(14) : I.flame(14);
+      const border = active ? t.vars['--accent'] : t.vars['--border'];
+      const shadow = active ? `box-shadow: 0 0 0 4px ${t.vars['--accent-soft']};` : '';
+      return `
+        <button class="theme-option" data-action="set-theme" data-id="${id}"
+          style="background: ${t.vars['--surface']}; border-color: ${border}; ${shadow}">
+          <div class="theme-opt-head">
+            <div class="theme-opt-icon" style="background: ${t.vars['--accent-soft']}; color: ${t.vars['--accent']};">${icon}</div>
+            ${active ? `<div class="theme-opt-check" style="background: ${t.vars['--accent']}; color: ${t.vars['--accent-contrast']};">${I.check(12)}</div>` : ''}
+          </div>
+          <div class="theme-opt-name" style="color: ${t.vars['--text']};">${t.name}</div>
+          <div class="theme-opt-mode" style="color: ${t.vars['--text-muted']};">${t.mode}</div>
+          <div class="theme-opt-swatches">
+            <div class="swatch" style="background: ${t.vars['--accent']};"></div>
+            <div class="swatch" style="background: ${t.vars['--day-amber']};"></div>
+            <div class="swatch" style="background: ${t.vars['--day-cyan']};"></div>
+            <div class="swatch" style="background: ${t.vars['--day-emerald']};"></div>
+            <div class="swatch" style="background: ${t.vars['--day-violet']};"></div>
+          </div>
+        </button>
+      `;
+    }).join('');
+
+    return `
+      <div class="modal-bg fade-in" data-action="close-picker">
+        <div class="modal slide-up" data-stop="1">
+          <div class="modal-head">
+            <div>
+              <div class="modal-eyebrow">Appearance</div>
+              <div class="modal-title">Theme</div>
+            </div>
+            <button class="modal-close" data-action="close-picker">${I.x(18)}</button>
+          </div>
+          <div class="theme-grid">${options}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderNav() {
+    const items = [
+      {id:'today', icon: I.dumbbell, label:'Today'},
+      {id:'program', icon: I.calendar, label:'Program'},
+      {id:'nutrition', icon: I.apple, label:'Fuel'},
+      {id:'progress', icon: I.trending, label:'Progress'}
+    ];
+    const btns = items.map(it => {
+      const active = state.tab === it.id;
+      const color = active ? 'var(--accent)' : 'var(--text-faint)';
+      return `
+        <button class="nav-btn ${active?'active':''}" data-action="set-tab" data-tab="${it.id}">
+          <div style="color: ${color};">${it.icon(20)}</div>
+          <div class="nav-lbl">${it.label}</div>
+        </button>
+      `;
+    }).join('');
+    return `<div class="nav"><div class="nav-inner">${btns}</div></div>`;
+  }
+
+  // ============================================================
+  //  EVENT HANDLERS
+  // ============================================================
+  function onClick(e) {
+    const target = e.target.closest('[data-action]');
+    if (!target) {
+      // stop propagation on modal content
+      return;
+    }
+    // Guard: if clicking modal content, don't close modal
+    if (target.dataset.action === 'close-picker') {
+      // Only close if actual background clicked, not child with data-stop
+      if (e.target.closest('[data-stop]')) return;
+      state.picker = false;
+      render();
+      return;
+    }
+    const a = target.dataset.action;
+    switch (a) {
+      case 'set-tab':
+        state.tab = target.dataset.tab;
+        render();
+        break;
+      case 'set-day':
+        state.day = parseInt(target.dataset.day);
+        render();
+        break;
+      case 'toggle-expand':
+        const id = target.dataset.id;
+        state.expanded[id] = !state.expanded[id];
+        render();
+        break;
+      case 'toggle-set': {
+        const ex = target.dataset.ex;
+        const i = parseInt(target.dataset.i);
+        const rest = target.dataset.rest;
+        const session = getSession();
+        if (!session[ex]) {
+          const exercise = PROGRAM[state.day].exercises.find(x => x.id === ex);
+          session[ex] = {sets: Array(exercise.sets).fill(null).map(() => ({weight:'',reps:'',done:false}))};
+        }
+        if (!session[ex].sets[i]) session[ex].sets[i] = {weight:'',reps:'',done:false};
+        const wasDone = session[ex].sets[i].done;
+        session[ex].sets[i].done = !wasDone;
+        setSessionLog(session);
+        if (!wasDone && rest) {
+          const sec = parseRest(rest);
+          state.rest = {duration: sec, remaining: sec, running: true};
+        }
+        render();
+        break;
+      }
+      case 'toggle-meal': {
+        const mid = target.dataset.id;
+        const tk = todayKey();
+        if (!state.meals[tk]) state.meals[tk] = {};
+        state.meals[tk][mid] = !state.meals[tk][mid];
+        save();
+        render();
+        break;
+      }
+      case 'open-picker':
+        state.picker = true;
+        render();
+        break;
+      case 'close-picker':
+        state.picker = false;
+        render();
+        break;
+      case 'set-theme':
+        state.theme = target.dataset.id;
+        state.picker = false;
+        save();
+        render();
+        break;
+      case 'set-session':
+        state.sessionTime = target.dataset.session;
+        save();
+        render();
+        break;
+      case 'timer-toggle':
+        if (state.rest) { state.rest.running = !state.rest.running; render(); }
+        break;
+      case 'timer-reset':
+        if (state.rest) { state.rest.remaining = state.rest.duration; state.rest.running = true; render(); }
+        break;
+      case 'timer-close':
+        state.rest = null;
+        render();
+        break;
+      case 'log-weight': {
+        const input = document.getElementById('bw-input');
+        const v = input ? parseFloat(input.value) : NaN;
+        if (!isNaN(v) && v > 0) {
+          state.bodyWeight[todayKey()] = v;
+          state.weightInput = '';
+          save();
+          render();
+        }
+        break;
+      }
+    }
+  }
+
+  function onInput(e) {
+    const t = e.target;
+    if (!t.dataset || !t.dataset.input) return;
+    if (t.dataset.input === 'set') {
+      const ex = t.dataset.ex;
+      const i = parseInt(t.dataset.i);
+      const field = t.dataset.field;
+      const session = getSession();
+      if (!session[ex]) {
+        const exercise = PROGRAM[state.day].exercises.find(x => x.id === ex);
+        session[ex] = {sets: Array(exercise.sets).fill(null).map(() => ({weight:'',reps:'',done:false}))};
+      }
+      if (!session[ex].sets[i]) session[ex].sets[i] = {weight:'',reps:'',done:false};
+      session[ex].sets[i][field] = t.value;
+      state.sessions[sessionKey()] = session;
+      state.history[todayKey()] = session;
+      save();
+      // Don't re-render on input to preserve focus & typing.
+    } else if (t.dataset.input === 'bw') {
+      state.weightInput = t.value;
+    }
+  }
+
+  // ============================================================
+  //  TIMER TICK
+  // ============================================================
+  setInterval(() => {
+    if (state.rest && state.rest.running && state.rest.remaining > 0) {
+      state.rest.remaining--;
+      if (state.rest.remaining === 0) beep();
+      render();
+    }
+  }, 1000);
+
+  // ============================================================
+  //  INIT
+  // ============================================================
+  document.addEventListener('click', onClick);
+  document.addEventListener('input', onInput);
+
+  load();
+  render();
+})();
+</script>
+</body>
+</html>

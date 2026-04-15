@@ -930,7 +930,7 @@
 
     return `
       <div class="modal-bg fade-in" data-action="close-sync">
-        <div class="modal slide-up" data-stop="1" style="max-height:90vh;overflow-y:auto;">
+        <div class="modal slide-up" data-stop="1" style="max-height:90vh;overflow-y:hidden;">
           <div class="modal-head">
             <div>
               <div class="modal-eyebrow">Cross-Device</div>
@@ -1578,6 +1578,13 @@
       // Only close if actual background clicked, not child with data-stop
       if (e.target.closest('[data-stop]')) return;
       state.picker = false;
+      render();
+      return;
+    }
+    if (target.dataset.action === 'close-sync') {
+      if (e.target.closest('[data-stop]')) return;
+      state.syncModal = false;
+      state.syncStatus = null;
       render();
       return;
     }

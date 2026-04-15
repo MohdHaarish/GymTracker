@@ -374,6 +374,7 @@
 </head>
 <body>
 <div id="app"></div>
+<div id="timer-root"></div>
 
 <script>
 (function() {
@@ -662,10 +663,15 @@
       '<div class="content">',
         renderTab(),
       '</div>',
-      state.rest ? renderTimer() : '',
       state.picker ? renderPicker() : '',
       renderNav()
     ].join('');
+  }
+
+  function mountTimer() {
+    const root = document.getElementById('timer-root');
+    if (!root) return;
+    root.innerHTML = state.rest ? renderTimer() : '';
   }
 
   function renderHeader() {
@@ -1265,6 +1271,7 @@
         if (!wasDone && rest) {
           const sec = parseRest(rest);
           state.rest = {duration: sec, remaining: sec, running: true};
+          mountTimer();
         }
         render();
         break;
@@ -1298,15 +1305,27 @@
         render();
         break;
       case 'timer-toggle':
-        if (state.rest) { state.rest.running = !state.rest.running; render(); }
+        if (state.rest) {
+          state.rest.running = !state.rest.running;
+          const btn = document.querySelector('[data-action="timer-toggle"]');
+          if (btn) btn.innerHTML = state.rest.running ? I.pause(18) : I.play(18);
+        }
         break;
       case 'timer-reset':
-        if (state.rest) { state.rest.remaining = state.rest.duration; state.rest.running = true; render(); }
+        if (state.rest) {
+          state.rest.remaining = state.rest.duration;
+          state.rest.running = true;
+          updateTimerDom();
+          const btn2 = document.querySelector('[data-action="timer-toggle"]');
+          if (btn2) btn2.innerHTML = I.pause(18);
+        }
         break;
-      case 'timer-close':
+      case 'timer-close': {
         state.rest = null;
-        render();
+        const tEl = document.querySelector('.timer');
+        if (tEl) tEl.remove();
         break;
+      }
       case 'log-weight': {
         const input = document.getElementById('bw-input');
         const v = input ? parseFloat(input.value) : NaN;
@@ -1345,13 +1364,28 @@
   }
 
   // ============================================================
-  //  TIMER TICK
+  //  TIMER TICK — surgical DOM update, no full re-render
   // ============================================================
+  function updateTimerDom() {
+    if (!state.rest) return;
+    const timeEl = document.querySelector('.timer-time');
+    const fillEl = document.querySelector('.timer-fill');
+    if (timeEl) {
+      const mins = Math.floor(state.rest.remaining / 60);
+      const secs = state.rest.remaining % 60;
+      timeEl.textContent = `${mins}:${String(secs).padStart(2,'0')}`;
+    }
+    if (fillEl) {
+      const pct = ((state.rest.duration - state.rest.remaining) / state.rest.duration) * 100;
+      fillEl.style.width = `${pct}%`;
+    }
+  }
+
   setInterval(() => {
     if (state.rest && state.rest.running && state.rest.remaining > 0) {
       state.rest.remaining--;
       if (state.rest.remaining === 0) beep();
-      render();
+      updateTimerDom();
     }
   }, 1000);
 

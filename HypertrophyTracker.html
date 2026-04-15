@@ -8,7 +8,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,500;1,400;1,500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
   :root {
@@ -426,8 +425,8 @@
   // ============================================================
   //  FIREBASE CONFIG
   //  Create a free project at https://console.firebase.google.com
-  //  Enable: Realtime Database + Authentication > Google sign-in
-  //  Then paste your config below.
+  //  Enable: Realtime Database (test mode)
+  //  Paste your project config below.
   // ============================================================
   const FIREBASE_CONFIG = {
     apiKey: "AIzaSyAn1tfsUu6PtikwBXdh0OZIjyVhJqPL69U",
@@ -440,34 +439,25 @@
     measurementId: "G-P7JPT3PC1Q"
   };
 
-  // Firebase runtime handles
-  let fbApp = null, fbDb = null, fbAuth = null, fbUser = null, fbListener = null;
-  let fbIgnoreUpdate = false; // prevent echo when we wrote the update ourselves
+  // Firebase runtime handles — no auth required, works on file:// protocol
+  let fbApp = null, fbDb = null, fbListener = null;
+  let fbIgnoreUpdate = false;
+  let fbSyncKey = ''; // set once by user, shared across devices
 
   (function initFirebase() {
     const cfg = FIREBASE_CONFIG;
-    if (!cfg.apiKey || !cfg.databaseURL) return; // not configured yet
+    if (!cfg.apiKey || !cfg.databaseURL) return;
     try {
-      fbApp  = firebase.initializeApp(cfg);
-      fbDb   = firebase.database();
-      fbAuth = firebase.auth();
-      fbAuth.onAuthStateChanged(user => {
-        fbUser = user;
-        if (user) {
-          startFirebaseListener();
-        } else {
-          if (fbListener) { fbListener(); fbListener = null; }
-        }
-        // Re-render header sync badge
-        const badge = document.getElementById('fb-badge');
-        if (badge) badge.outerHTML = renderFbBadge();
-        else render();
-      });
+      fbApp = firebase.initializeApp(cfg);
+      fbDb  = firebase.database();
+      // Load saved sync key and start listening
+      const saved = localStorage.getItem('hyp-sync-key');
+      if (saved) { fbSyncKey = saved; startFirebaseListener(); }
     } catch(e) { console.warn('Firebase init failed', e); }
   })();
 
   function fbRef() {
-    return fbUser ? fbDb.ref('users/' + fbUser.uid + '/gymdata') : null;
+    return (fbDb && fbSyncKey) ? fbDb.ref('syncs/' + fbSyncKey + '/gymdata') : null;
   }
 
   function startFirebaseListener() {
@@ -477,7 +467,7 @@
     ref.on('value', snapshot => {
       if (fbIgnoreUpdate) return;
       const data = snapshot.val();
-      if (!data) { fbSave(); return; } // first time — push local data up
+      if (!data) { fbSave(); return; } // first time on this key — push local data up
       applyRemoteData(data);
     }, err => console.warn('Firebase listen error', err));
     fbListener = () => ref.off('value');
@@ -485,10 +475,10 @@
 
   function applyRemoteData(data) {
     let changed = false;
-    if (data.sessions)    { state.sessions    = data.sessions;    changed = true; }
-    if (data.meals)       { state.meals        = data.meals;       changed = true; }
-    if (data.history)     { state.history      = data.history;     changed = true; }
-    if (data.bodyWeight)  { state.bodyWeight   = data.bodyWeight;  changed = true; }
+    if (data.sessions)   { state.sessions   = data.sessions;   changed = true; }
+    if (data.meals)      { state.meals       = data.meals;      changed = true; }
+    if (data.history)    { state.history     = data.history;    changed = true; }
+    if (data.bodyWeight) { state.bodyWeight  = data.bodyWeight; changed = true; }
     if (data.theme && THEMES && THEMES[data.theme]) { state.theme = data.theme; changed = true; }
     if (data.sessionTime === 'morning' || data.sessionTime === 'evening') {
       state.sessionTime = data.sessionTime; changed = true;
@@ -503,31 +493,38 @@
     const ref = fbRef();
     if (!ref) return;
     fbIgnoreUpdate = true;
-    ref.set(getExportData()).finally(() => { fbIgnoreUpdate = false; });
+    const p = ref.set(getExportData());
+    if (p && p.finally) p.finally(() => { fbIgnoreUpdate = false; });
+    else fbIgnoreUpdate = false;
   }
 
-  function signInGoogle() {
-    if (!fbAuth) return;
-    const provider = new firebase.auth.GoogleAuthProvider();
-    fbAuth.signInWithPopup(provider).catch(e => console.warn('Sign-in failed', e));
+  function setSyncKey(key) {
+    key = key.trim().replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!key || key.length < 4) return false;
+    fbSyncKey = key;
+    localStorage.setItem('hyp-sync-key', key);
+    startFirebaseListener();
+    return true;
   }
 
-  function signOut() {
-    if (!fbAuth) return;
-    fbAuth.signOut();
+  function clearSyncKey() {
+    fbSyncKey = '';
+    localStorage.removeItem('hyp-sync-key');
+    if (fbListener) { fbListener(); fbListener = null; }
   }
 
   function renderFbBadge() {
-    if (!fbApp) return ''; // Firebase not configured
-    if (!fbUser) {
-      return `<button id="fb-badge" class="icon-btn" data-action="fb-signin" aria-label="Sign in to sync" style="gap:6px;padding:0 10px;width:auto;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;color:var(--accent);border-color:var(--accent-border);">
-        ${I.syncIcon(14)} SIGN IN
+    if (!fbApp) return '';
+    if (!fbSyncKey) {
+      return `<button id="fb-badge" class="icon-btn" data-action="open-sync"
+        style="gap:6px;padding:0 10px;width:auto;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;color:var(--accent);border-color:var(--accent-border);">
+        ${I.syncIcon(14)} SET KEY
       </button>`;
     }
-    return `<button id="fb-badge" class="icon-btn" data-action="fb-signout" aria-label="Signed in — tap to sign out"
+    return `<button id="fb-badge" class="icon-btn" data-action="open-sync"
       style="gap:6px;padding:0 10px;width:auto;font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0.1em;">
       <span style="width:7px;height:7px;border-radius:50%;background:var(--success-text);display:inline-block;flex-shrink:0;"></span>
-      SYNCED
+      LIVE
     </button>`;
   }
 
@@ -905,31 +902,29 @@
     const status = state.syncStatus;
     const fbConfigured = !!(fbApp);
     const cloudSection = fbConfigured
-      ? (fbUser
+      ? (fbSyncKey
           ? `<div class="sync-section" style="background:var(--success-bg);border-bottom:1px solid var(--success-border);">
                <div style="display:flex;align-items:center;gap:10px;">
                  <span style="width:10px;height:10px;border-radius:50%;background:var(--success-text);flex-shrink:0;"></span>
-                 <div>
-                   <div style="font-size:13px;font-weight:500;color:var(--success-text);">Cloud sync active</div>
-                   <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:2px;">${esc(fbUser.email||fbUser.displayName||fbUser.uid)}</div>
+                 <div style="flex:1;min-width:0;">
+                   <div style="font-size:13px;font-weight:500;color:var(--success-text);">Live cloud sync active</div>
+                   <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--text-muted);margin-top:2px;">Key: ${esc(fbSyncKey)}</div>
                  </div>
-                 <button data-action="fb-signout" style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);padding:6px 10px;border-radius:8px;background:var(--surface-alt);border:1px solid var(--border);">Sign out</button>
+                 <button data-action="fb-clear-key" style="font-family:'JetBrains Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);padding:6px 10px;border-radius:8px;background:var(--surface-alt);border:1px solid var(--border);flex-shrink:0;">Clear</button>
                </div>
              </div>`
           : `<div class="sync-section">
                <div class="sync-section-label">Automatic Cloud Sync</div>
-               <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">Sign in with Google to sync all data automatically across every device — no manual steps needed.</p>
-               <button class="sync-btn" data-action="fb-signin" style="display:flex;align-items:center;justify-content:center;gap:8px;">
-                 ${I.syncIcon(14)} Sign in with Google
+               <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">Enter the same sync key on every device. Data syncs automatically — no login needed.</p>
+               <input id="fb-key-input" class="themed-input" placeholder="Choose a sync key (e.g. haari-gym-2024)" style="margin-bottom:10px;" value="">
+               <button class="sync-btn" data-action="fb-set-key" style="display:flex;align-items:center;justify-content:center;gap:8px;">
+                 ${I.syncIcon(14)} Activate Sync
                </button>
              </div>`)
       : `<div class="sync-section" style="background:var(--accent-bg);border-bottom:1px solid var(--accent-border);">
-           <div class="sync-section-label" style="color:var(--accent);">Cloud Sync — Setup Required</div>
+           <div class="sync-section-label" style="color:var(--accent);">Cloud Sync — Firebase Not Configured</div>
            <p style="font-size:12px;color:var(--text-muted);line-height:1.6;margin-bottom:4px;">
-             1. Go to <strong style="color:var(--text);">console.firebase.google.com</strong> → create a free project<br>
-             2. Enable <strong style="color:var(--text);">Realtime Database</strong> + <strong style="color:var(--text);">Authentication → Google</strong><br>
-             3. Copy your Firebase config into the <code style="color:var(--accent);font-size:11px;">FIREBASE_CONFIG</code> object at the top of this HTML file<br>
-             4. Reload — then sign in with Google for automatic sync
+             Paste your Firebase config into <code style="color:var(--accent);font-size:11px;">FIREBASE_CONFIG</code> at the top of this HTML file, then reload.
            </p>
          </div>`;
 
@@ -1631,11 +1626,23 @@
         render();
         break;
       }
-      case 'fb-signin':
-        signInGoogle();
+      case 'fb-set-key': {
+        const inp = document.getElementById('fb-key-input');
+        const k = inp ? inp.value : '';
+        if (!setSyncKey(k)) {
+          state.syncStatus = {ok: false, msg: 'Key must be at least 4 characters (letters, numbers, - _).'};
+        } else {
+          state.syncStatus = {ok: true, msg: 'Sync active! Use the same key on every device.'};
+        }
+        render();
         break;
-      case 'fb-signout':
-        if (confirm('Sign out of cloud sync?')) signOut();
+      }
+      case 'fb-clear-key':
+        if (confirm('Stop cloud sync and remove sync key from this device?')) {
+          clearSyncKey();
+          state.syncStatus = {ok: true, msg: 'Sync key removed from this device.'};
+          render();
+        }
         break;
       case 'open-sync':
         state.syncModal = true;
